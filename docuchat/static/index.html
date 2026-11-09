@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocuChat</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#1b1a17; --soft:#5d584f; --line:#e2ddd2; --accent:#d2461b; --mark:#fff1c2; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121110; --card:#1c1b19; --ink:#ece7dc; --soft:#a9a397; --line:#2f2d29; --accent:#ff6a3d; --mark:#4a3b10; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui, sans-serif; }
+  main { max-width:820px; margin:0 auto; padding:40px 16px 80px; }
+  h1 { font-size:32px; margin:0 0 4px; letter-spacing:-.02em; }
+  h1 span { color:var(--accent); }
+  .sub { color:var(--soft); margin:0 0 28px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  input[type=text] { flex:1; min-width:200px; padding:12px 14px; font:inherit; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  button, label.btn { padding:11px 18px; font:500 15px system-ui; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:var(--bg); cursor:pointer; }
+  label.btn { background:transparent; color:var(--ink); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .docs { font-size:14px; color:var(--soft); margin-top:12px; }
+  .docs b { color:var(--ink); font-weight:500; }
+  .answer { font-size:17px; white-space:pre-wrap; }
+  .cites { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); font-size:14px; }
+  .cite { margin:6px 0; color:var(--soft); }
+  .cite strong { color:var(--accent); font-weight:600; }
+  mark { background:var(--mark); color:inherit; padding:0 2px; }
+  details { font-size:14px; color:var(--soft); }
+  details p { margin:10px 0; }
+  .err { color:var(--accent); font-size:14px; margin-bottom:10px; }
+  .muted { color:var(--soft); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Docu<span>Chat</span></h1>
+  <p class="sub">Upload a PDF, ask a question, get an answer with the exact page it came from.</p>
+
+  <div class="card">
+    <div class="row">
+      <label class="btn" for="file">Upload PDF / TXT</label>
+      <input id="file" type="file" accept=".pdf,.txt,.md" hidden>
+      <span class="muted" id="uploadMsg"></span>
+    </div>
+    <div class="docs" id="docs"></div>
+  </div>
+
+  <form class="card row" id="askForm">
+    <input type="text" id="q" placeholder="e.g. How many vacation days do I get?" autocomplete="off" required minlength="3">
+    <button id="askBtn">Ask</button>
+  </form>
+
+  <div id="result"></div>
+</main>
+
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function loadDocs() {
+  const docs = await (await fetch("/api/documents")).json();
+  document.getElementById("docs").innerHTML = docs.length
+    ? "Indexed: " + docs.map(d => `<b>${esc(d.name)}</b> (${d.chunks} chunks)`).join(", ")
+    : "No documents yet - upload one to start.";
+}
+
+document.getElementById("file").addEventListener("change", async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const msg = document.getElementById("uploadMsg");
+  msg.textContent = "Indexing " + file.name + "...";
+  const body = new FormData(); body.append("file", file);
+  const res = await fetch("/api/documents", { method: "POST", body });
+  const data = await res.json();
+  msg.textContent = res.ok ? `Added ${data.name} (${data.chunks} chunks)` : (data.detail || "Upload failed");
+  e.target.value = "";
+  loadDocs();
+});
+
+document.getElementById("askForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("askBtn"), out = document.getElementById("result");
+  btn.disabled = true; btn.textContent = "Thinking...";
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: document.getElementById("q").value })
+    });
+    const data = await res.json();
+    if (!res.ok) { out.innerHTML = `<div class="card err">${esc(data.detail || "Request failed")}</div>`; return; }
+    let html = '<div class="card">';
+    if (data.error) html += `<div class="err">${esc(data.error)}</div>`;
+    if (data.answer) html += `<div class="answer">${esc(data.answer)}</div>`;
+    if (data.citations.length) {
+      html += '<div class="cites">' + data.citations.map(c =>
+        `<div class="cite"><strong>${esc(c.source)} · page ${c.page}</strong> — <mark>${esc(c.quote)}</mark></div>`).join("") + "</div>";
+    }
+    html += "</div>";
+    if (data.passages.length) {
+      html += `<details class="card" ${data.answer ? "" : "open"}><summary>Retrieved passages (${data.passages.length})</summary>` +
+        data.passages.map(p => `<p><b>${esc(p.source)} p.${p.page}</b> · score ${p.score}<br>${esc(p.text)}</p>`).join("") + "</details>";
+    } else if (!data.answer) {
+      html = '<div class="card muted">No matching passages found.</div>';
+    }
+    out.innerHTML = html;
+  } finally {
+    btn.disabled = false; btn.textContent = "Ask";
+  }
+});
+
+loadDocs();
+</script>
+</body>
+</html>
