@@ -7,7 +7,7 @@ passages, finds the passages relevant to a question with a BM25 search engine wr
 scratch, and has Claude answer *only* from those passages. Every claim in the answer comes back
 with a machine-readable citation to its source page.
 
-![CI](https://github.com/YOUR-USERNAME/docuchat/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/oliverkraus-source/docuchat/actions/workflows/ci.yml/badge.svg)
 
 <!-- Add a screenshot or GIF of the app answering a question here: docs/screenshot.png -->
 
@@ -37,7 +37,7 @@ flowchart LR
 ## Quick start
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/docuchat.git
+git clone https://github.com/oliverkraus-source/docuchat.git
 cd docuchat
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
