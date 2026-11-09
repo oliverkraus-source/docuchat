@@ -9,7 +9,10 @@ with a machine-readable citation to its source page.
 
 ![CI](https://github.com/oliverkraus-source/docuchat/actions/workflows/ci.yml/badge.svg)
 
-<!-- Add a screenshot or GIF of the app answering a question here: docs/screenshot.png -->
+<img src="docs/screenshot.png" alt="DocuChat answering 'How many vacation days do I get?' with three citations to page 3 of the sample handbook" width="620">
+
+*The answer cites the exact sentences it used, and says what the document does **not** cover
+(part-time employees) instead of guessing.*
 
 ## Why it's built this way
 
