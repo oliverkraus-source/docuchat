@@ -85,15 +85,20 @@ def ask(req: AskRequest):
     ]
     try:
         result = answer_question(req.question, hits)
-    except (LLMNotConfigured, anthropic.AuthenticationError):
+    except LLMNotConfigured:
         return {"answer": None, "citations": [], "passages": passages,
-                "error": "No valid ANTHROPIC_API_KEY set - showing the best matching passages only."}
+                "error": "ANTHROPIC_API_KEY is not set in the terminal that started the server - "
+                         "showing the best matching passages only."}
+    except anthropic.AuthenticationError:
+        return {"answer": None, "citations": [], "passages": passages,
+                "error": "ANTHROPIC_API_KEY was rejected by the API - check it was copied completely. "
+                         "Showing the best matching passages only."}
     except anthropic.RateLimitError as exc:
         raise HTTPException(429, "Rate limited by the model API, try again in a minute") from exc
     except anthropic.APIConnectionError as exc:
         raise HTTPException(503, "Could not reach the model API") from exc
-    except anthropic.APIStatusError as exc:
-        raise HTTPException(502, f"Model API error ({exc.status_code})") from exc
+    except anthropic.APIStatusError as exc:   # e.g. credit balance too low
+        raise HTTPException(502, f"Model API error ({exc.status_code}): {exc.message}") from exc
     return {
         "answer": result.text,
         "citations": [c.__dict__ for c in result.citations],
