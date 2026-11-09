@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+import anthropic
+
 from .answer import LLMNotConfigured, answer_question
 from .api import INDEX_PATH
 from .ingest import chunk_file
@@ -51,6 +53,9 @@ def main(argv: list[str] | None = None) -> int:
             result = answer_question(args.question, hits)
         except LLMNotConfigured as exc:
             print(f"{exc} Showing the best matching passages instead:\n")
+        except anthropic.AuthenticationError:
+            print("Your ANTHROPIC_API_KEY was rejected - check that it is copied correctly. "
+                  "Showing the best matching passages instead:\n")
         else:
             print(result.text)
             if result.citations:
